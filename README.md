@@ -75,11 +75,6 @@ streamlit run app.py
 http://localhost:8501
 ```
 
-## Dependências
-```
-pip install -r requirements.txt
-```
-
 ## Dataset
 
 O projeto utiliza o dataset **Marvel Universe Social Network**:
