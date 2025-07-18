@@ -1043,7 +1043,7 @@ with st.expander("Clique aqui para ver a análise crítica detalhada", expanded=
         st.markdown(f"**{conclusion}**")
         st.markdown(explanation)
 
-        else:
+    else:
             st.warning("⚠️ Não há dados suficientes para análise de modelos teóricos.")
 
     with tab_links:
