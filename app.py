@@ -638,6 +638,7 @@ with tab1:
     st.info("""
     O algoritmo de Louvain detecta **comunidades** (grupos de nós densamente conectados) na rede. Ele maximiza a **modularidade**, uma medida da qualidade da divisão da rede em comunidades.
     """)
+    
     if G.number_of_nodes() > 0 and G.number_of_edges() > 0:
         partition = community_louvain.best_partition(G, weight='weight')
         modularity = community_louvain.modularity(partition, G, weight='weight')
@@ -647,8 +648,148 @@ with tab1:
         col1.metric("Número de Comunidades Detectadas", f"{num_communities:,}")
         col2.metric("Modularidade da Partição", f"{modularity:.4f}")
 
+        # Organizar comunidades por tamanho
+        communities_dict = {}
+        for node, community in partition.items():
+            if community not in communities_dict:
+                communities_dict[community] = []
+            communities_dict[community].append(node)
+        
+        # Ordenar comunidades por tamanho (maior primeiro)
+        sorted_communities = sorted(communities_dict.items(), key=lambda x: len(x[1]), reverse=True)
+        
+        # Estatísticas das comunidades
+        community_sizes = [len(members) for _, members in sorted_communities]
+        
+        st.markdown("#### 📊 Estatísticas das Comunidades")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Maior Comunidade", f"{max(community_sizes)} personagens")
+        with col2:
+            st.metric("Menor Comunidade", f"{min(community_sizes)} personagens")
+        with col3:
+            st.metric("Tamanho Médio", f"{np.mean(community_sizes):.1f}")
+        with col4:
+            st.metric("Tamanho Mediano", f"{np.median(community_sizes):.0f}")
+        
+        # Gráfico de distribuição de tamanhos
+        fig_comm_sizes = px.histogram(
+            x=community_sizes,
+            nbins=min(20, len(community_sizes)),
+            title="Distribuição de Tamanhos das Comunidades",
+            labels={'x': 'Tamanho da Comunidade', 'y': 'Frequência'},
+            color_discrete_sequence=['#8e44ad']
+        )
+        st.plotly_chart(fig_comm_sizes, use_container_width=True)
+        
+        # Mostrar as maiores comunidades
+        st.markdown("#### 🏆 Maiores Comunidades Detectadas")
+        
+        num_communities_to_show = min(10, len(sorted_communities))
+        
+        for i, (community_id, members) in enumerate(sorted_communities[:num_communities_to_show]):
+            with st.expander(f"🔸 Comunidade {community_id + 1} - {len(members)} personagens", expanded=(i < 3)):
+                
+                # Converter IDs para nomes
+                member_names = []
+                for member_id in members:
+                    name = id_to_name.get(member_id, f"Character {member_id}")
+                    member_names.append(name)
+                
+                # Ordenar nomes alfabeticamente
+                member_names.sort()
+                
+                # Mostrar estatísticas da comunidade
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"**Tamanho:** {len(members)} personagens")
+                    
+                    # Calcular densidade interna da comunidade
+                    subgraph = G.subgraph(members)
+                    internal_density = nx.density(subgraph) if subgraph.number_of_nodes() > 1 else 0
+                    st.markdown(f"**Densidade Interna:** {internal_density:.3f}")
+                
+                with col2:
+                    # Encontrar o personagem mais conectado dentro da comunidade
+                    degrees_in_community = {node: G.degree(node) for node in members}
+                    most_connected = max(degrees_in_community, key=degrees_in_community.get)
+                    most_connected_name = id_to_name.get(most_connected, f"Character {most_connected}")
+                    st.markdown(f"**Personagem Central:** {most_connected_name}")
+                    st.markdown(f"**Grau:** {degrees_in_community[most_connected]}")
+                
+                # Mostrar membros da comunidade
+                st.markdown("**Membros da Comunidade:**")
+                
+                # Dividir em colunas para melhor visualização
+                cols = st.columns(3)
+                for idx, name in enumerate(member_names):
+                    col_idx = idx % 3
+                    with cols[col_idx]:
+                        # Destacar o personagem mais conectado
+                        if name == most_connected_name:
+                            st.markdown(f"⭐ **{name}**")
+                        else:
+                            st.markdown(f"• {name}")
+        
+        # Visualização das comunidades como gráfico de barras
+        st.markdown("#### 📈 Ranking das Comunidades por Tamanho")
+        
+        top_communities = sorted_communities[:15]  # Top 15 comunidades
+        community_labels = [f"Comunidade {comm_id + 1}" for comm_id, _ in top_communities]
+        community_sizes_top = [len(members) for _, members in top_communities]
+        
+        fig_ranking = px.bar(
+            x=community_sizes_top,
+            y=community_labels,
+            orientation='h',
+            title="Top 15 Comunidades por Número de Personagens",
+            labels={'x': 'Número de Personagens', 'y': 'Comunidade'},
+            color_discrete_sequence=['#e74c3c']
+        )
+        fig_ranking.update_layout(height=500)
+        st.plotly_chart(fig_ranking, use_container_width=True)
+        
+        # Análise de modularidade
+        st.markdown("#### 🔍 Análise de Qualidade da Partição")
+        
+        if modularity > 0.3:
+            quality_status = "🟢 Excelente"
+            quality_desc = "A partição em comunidades é muito boa. As comunidades são bem definidas e densas internamente."
+        elif modularity > 0.2:
+            quality_status = "🟡 Boa"
+            quality_desc = "A partição é razoável. Há uma estrutura de comunidades clara, mas pode haver sobreposições."
+        else:
+            quality_status = "🔴 Fraca"
+            quality_desc = "A partição em comunidades é fraca. A rede pode não ter uma estrutura de comunidades bem definida."
+        
+        st.markdown(f"**Status da Modularidade:** {quality_status}")
+        st.markdown(f"**Interpretação:** {quality_desc}")
+        
+        # Salvar informações das comunidades para uso posterior
         nx.set_node_attributes(G, partition, 'community')
-        st.success("As comunidades foram calculadas e podem ser usadas para colorir a visualização interativa.")
+        st.success("✅ As comunidades foram detectadas e analisadas com sucesso!")
+        
+        # Informações adicionais
+        with st.expander("ℹ️ Mais Informações sobre o Algoritmo de Louvain"):
+            st.markdown("""
+            **Como funciona o Algoritmo de Louvain:**
+            
+            1. **Inicialização:** Cada nó começa como sua própria comunidade
+            2. **Otimização Local:** Para cada nó, testa mover para comunidades vizinhas
+            3. **Agregação:** Cria um novo grafo onde cada comunidade vira um super-nó
+            4. **Repetição:** Repete até não haver mais melhoria na modularidade
+            
+            **Vantagens:**
+            - Muito rápido para redes grandes
+            - Encontra comunidades hierárquicas
+            - Maximiza a modularidade
+            
+            **Limitações:**
+            - Pode encontrar diferentes partições em execuções diferentes
+            - Favorece comunidades de tamanhos similares
+            - Não detecta comunidades sobrepostas
+            """)
+    
     else:
         st.warning("Não é possível detectar comunidades em um grafo vazio ou sem arestas.")
 
