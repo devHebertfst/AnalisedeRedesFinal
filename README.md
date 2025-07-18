@@ -117,5 +117,7 @@ A análise revela que a rede Marvel:
 
 **Hebert França**
 
-GitHub: [@devHebertfst](https://github.com/devHebertfst)
-Streamlit: https://j4pybvzpmbwoydpgprl9qm.streamlit.app/
+- GitHub: [@devHebertfst](https://github.com/devHebertfst)
+- Streamlit: https://j4pybvzpmbwoydpgprl9qm.streamlit.app/
+- Gephi: https://github.com/devHebertfst/NetworkPersonagensMarvel  
+- Visualização: https://devhebertfst.github.io/NetworkPersonagensMarvel/
