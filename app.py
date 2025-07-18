@@ -858,111 +858,193 @@ with st.expander("Clique aqui para ver a análise crítica detalhada", expanded=
         st.subheader("A Rede Marvel é um Mundo Pequeno ou Livre de Escala?")
         st.markdown("""
         Redes reais raramente são completamente aleatórias. Elas geralmente seguem padrões, como os de **Mundo Pequeno** (alta clusterização e caminhos curtos, como no modelo de Watts-Strogatz) ou **Livre de Escala** (distribuição de grau seguindo uma Lei de Potência, com hubs, como no modelo Barabási-Albert).
-
-        - **Evidência de Mundo Pequeno:**
-          - **Coeficiente de Clustering Global Alto:** Já vimos que é `~0.62`, o que é muito maior do que em uma rede aleatória do mesmo tamanho. Isso indica a formação de grupos (Vingadores, X-Men, etc.).
-          - **Caminho Médio Curto:** Também já calculado, mostra que qualquer personagem está a poucos "passos" de qualquer outro.
-
-        - **Evidência de Rede Livre de Escala (Power-Law):**
-        A principal característica é que a maioria dos personagens tem poucas conexões, enquanto alguns poucos (os "hubs") têm um número imenso de conexões. Podemos verificar isso plotando a distribuição de grau em uma escala log-log. Se o resultado for uma linha reta, temos uma forte evidência.
         """)
 
-        # Preparar dados para o gráfico log-log
-        degrees = [G.degree(n) for n in G.nodes()]
-        degree_counts = pd.Series(degrees).value_counts().sort_index()
+        actual_clustering = nx.average_clustering(G)
         
-        fig_log = go.Figure()
-        fig_log.add_trace(go.Scatter(
-            x=degree_counts.index, 
-            y=degree_counts.values, 
-            mode='markers',
-            name='Distribuição Empírica'
-        ))
-        fig_log.update_layout(
-            title="Distribuição de Grau em Escala Log-Log",
-            xaxis_title="Grau (k)",
-            yaxis_title="Número de Nós com Grau k (P(k))",
-            xaxis_type="log",
-            yaxis_type="log"
-        )
-        st.plotly_chart(fig_log, use_container_width=True)
-
-        st.markdown("""
-        **Conclusão da Análise de Modelo:**
-        O gráfico log-log acima se aproxima de uma linha reta, o que é uma **assinatura clássica de uma rede Livre de Escala**. A rede da Marvel não é aleatória; ela foi moldada por um processo de "conexão preferencial": novos personagens têm maior probabilidade de serem associados a personagens já famosos (os hubs, como Capitão América e Homem-Aranha).
-
-        Portanto, a rede da Marvel exibe propriedades tanto de **Mundo Pequeno** quanto, mais fortemente, de **Livre de Escala**.
-        """)
-
-
-    with tab_resiliencia:
-        st.subheader("Quão Robusta é a Rede Marvel?")
-        st.markdown("""
-        A resiliência mede a capacidade de uma rede de manter sua funcionalidade após a remoção de nós. Redes Livres de Escala, como a da Marvel, são conhecidas por serem muito **resilientes a falhas aleatórias**, mas **extremamente vulneráveis a ataques direcionados** aos seus hubs.
-
-        Vamos simular isso:
-        1.  **Ataque Direcionado:** Removeremos os personagens em ordem decrescente de importância (maior grau).
-        2.  **Ataque Aleatório:** Removeremos personagens em ordem aleatória.
-
-        Mediremos o tamanho do maior componente conectado após cada remoção. Uma queda rápida indica baixa resiliência.
-        """)
-
-        @st.cache_data
-        def simulate_attack(_graph, attack_type='targeted'):
-            g = _graph.copy()
-            if attack_type == 'targeted':
-                nodes_to_remove = sorted(g.degree, key=lambda x: x[1], reverse=True)
-                nodes_to_remove = [n for n, d in nodes_to_remove]
-            else: # random
-                nodes_to_remove = list(g.nodes())
-                random.shuffle(nodes_to_remove)
+        n_nodes = G.number_of_nodes()
+        n_edges = G.number_of_edges()
+        
+        if n_nodes > 0 and n_edges > 0:
+            p_random = (2 * n_edges) / (n_nodes * (n_nodes - 1))
             
-            largest_component_sizes = [len(max(nx.connected_components(g), key=len))]
+            expected_clustering_random = p_random
             
-            for i in range(1, len(nodes_to_remove)):
-                g.remove_node(nodes_to_remove[i-1])
-                if g.number_of_nodes() > 0:
-                    components = list(nx.connected_components(g))
-                    if components:
-                        largest_component_sizes.append(len(max(components, key=len)))
-                    else:
-                        largest_component_sizes.append(0)
-                else:
-                    largest_component_sizes.append(0)
+            actual_path_length = metrics.get('avg_path_length', 'N/A')
             
-            return [size / _graph.number_of_nodes() for size in largest_component_sizes]
-
-        if st.button("Executar Simulação de Resiliência (pode levar um minuto)"):
-            with st.spinner("Simulando ataques..."):
-                # Usar um subgrafo para a simulação ser mais rápida
-                main_nodes = max(nx.connected_components(G), key=len)
-                G_main = G.subgraph(main_nodes)
-
-                targeted_resilience = simulate_attack(G_main, 'targeted')
-                random_resilience = simulate_attack(G_main, 'random')
+            if p_random > 0:
+                expected_path_random = np.log(n_nodes) / np.log(n_nodes * p_random)
+            else:
+                expected_path_random = "N/A"
+            
+            st.markdown("#### 📊 Comparação com Rede Aleatória Equivalente")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Coeficiente de Clustering:**")
+                st.metric("Rede Marvel", f"{actual_clustering:.4f}")
+                st.metric("Rede Aleatória (esperado)", f"{expected_clustering_random:.4f}")
                 
-                fig_resilience = go.Figure()
-                fig_resilience.add_trace(go.Scatter(
-                    x=np.linspace(0, 1, len(targeted_resilience)),
-                    y=targeted_resilience,
-                    mode='lines', name='Ataque Direcionado (por Grau)'
-                ))
-                fig_resilience.add_trace(go.Scatter(
-                    x=np.linspace(0, 1, len(random_resilience)),
-                    y=random_resilience,
-                    mode='lines', name='Ataque Aleatório'
-                ))
-                fig_resilience.update_layout(
-                    title="Resiliência da Rede a Ataques",
-                    xaxis_title="Fração de Nós Removidos",
-                    yaxis_title="Tamanho Relativo do Maior Componente"
-                )
-                st.plotly_chart(fig_resilience, use_container_width=True)
+                if actual_clustering > expected_clustering_random * 2:
+                    st.success("✅ **Mundo Pequeno**: Clustering muito maior que o esperado!")
+                elif actual_clustering > expected_clustering_random:
+                    st.info("🔸 Clustering moderadamente maior que o esperado")
+                else:
+                    st.warning("⚠️ Clustering similar ao de rede aleatória")
+            
+            with col2:
+                st.markdown("**Caminho Médio:**")
+                if actual_path_length != "N/A":
+                    st.metric("Rede Marvel", f"{actual_path_length:.2f}")
+                else:
+                    st.metric("Rede Marvel", "N/A")
+                
+                if expected_path_random != "N/A":
+                    st.metric("Rede Aleatória (esperado)", f"{expected_path_random:.2f}")
+                else:
+                    st.metric("Rede Aleatória (esperado)", "N/A")
+                
+                if actual_path_length != "N/A" and expected_path_random != "N/A":
+                    ratio = actual_path_length / expected_path_random
+                    if ratio < 2:
+                        st.success("✅ **Mundo Pequeno**: Caminho médio similar ao aleatório!")
+                    else:
+                        st.info("🔸 Caminho médio um pouco maior que o esperado")
 
-                st.markdown("""
-                **Conclusão da Análise de Resiliência:**
-                O resultado é claro: a rede se desintegra **muito mais rápido sob ataque direcionado**. Remover apenas 5-10% dos personagens mais centrais (como Capitão América, Homem-Aranha, Thor) é suficiente para quebrar a rede em múltiplos fragmentos isolados. Narrativamente, isso significa que derrotar os principais heróis é uma estratégia extremamente eficaz para desestabilizar o universo Marvel.
-                """)
+        st.markdown("#### 🔍 Análise da Distribuição de Grau (Lei de Potência)")
+        
+        degrees = [G.degree(n) for n in G.nodes()]
+        
+        if degrees:
+            degree_counts = pd.Series(degrees).value_counts().sort_index()
+            
+            degree_values = degree_counts.index.values
+            frequencies = degree_counts.values
+            probabilities = frequencies / sum(frequencies)
+            
+            valid_mask = (degree_values > 0) & (probabilities > 0)
+            log_degrees = np.log10(degree_values[valid_mask])
+            log_probs = np.log10(probabilities[valid_mask])
+            
+            fig_log = go.Figure()
+            fig_log.add_trace(go.Scatter(
+                x=degree_values[valid_mask], 
+                y=probabilities[valid_mask], 
+                mode='markers',
+                name='Distribuição Empírica',
+                marker=dict(size=8, color='#3498db')
+            ))
+            
+            if len(log_degrees) > 1:
+                slope, intercept = np.polyfit(log_degrees, log_probs, 1)
+                fitted_line = 10**(slope * log_degrees + intercept)
+                
+                fig_log.add_trace(go.Scatter(
+                    x=degree_values[valid_mask],
+                    y=fitted_line,
+                    mode='lines',
+                    name=f'Ajuste Linear (γ ≈ {-slope:.2f})',
+                    line=dict(color='red', dash='dash')
+                ))
+            
+            fig_log.update_layout(
+                title="Distribuição de Grau em Escala Log-Log",
+                xaxis_title="Grau (k)",
+                yaxis_title="Probabilidade P(k)",
+                xaxis_type="log",
+                yaxis_type="log",
+                showlegend=True
+            )
+            st.plotly_chart(fig_log, use_container_width=True)
+            
+            st.markdown("#### 📈 Estatísticas da Distribuição de Grau")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Grau Médio", f"{np.mean(degrees):.2f}")
+                st.metric("Grau Mediano", f"{np.median(degrees):.0f}")
+            
+            with col2:
+                st.metric("Grau Máximo", f"{max(degrees)}")
+                st.metric("Grau Mínimo", f"{min(degrees)}")
+            
+            with col3:
+                st.metric("Desvio Padrão", f"{np.std(degrees):.2f}")
+                skewness = pd.Series(degrees).skew()
+                st.metric("Assimetria", f"{skewness:.2f}")
+            
+            if len(log_degrees) > 1:
+                correlation = np.corrcoef(log_degrees, log_probs)[0, 1]
+                r_squared = correlation ** 2
+                
+                st.markdown("#### 🎯 Evidência de Lei de Potência")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("Expoente γ (gamma)", f"{-slope:.3f}")
+                    st.metric("R² do Ajuste Log-Log", f"{r_squared:.3f}")
+                
+                with col2:
+                    if r_squared > 0.8:
+                        st.success("✅ **Forte evidência** de Lei de Potência")
+                    elif r_squared > 0.6:
+                        st.info("🔸 **Evidência moderada** de Lei de Potência")
+                    else:
+                        st.warning("⚠️ **Fraca evidência** de Lei de Potência")
+                    
+                    if 2 <= -slope <= 3:
+                        st.info("🔸 Expoente típico de redes livre de escala")
+                    else:
+                        st.info("🔸 Expoente fora do range típico (2-3)")
+
+        st.markdown("#### 🏁 Conclusão da Análise de Modelos")
+        
+        is_small_world = False
+        is_scale_free = False
+        
+        if actual_clustering > expected_clustering_random * 2:
+            is_small_world = True
+        
+        if len(log_degrees) > 1 and r_squared > 0.6:
+            is_scale_free = True
+        
+        if is_small_world and is_scale_free:
+            conclusion = "🎯 **Rede Livre de Escala com Propriedades de Mundo Pequeno**"
+            explanation = """
+            A rede Marvel exibe características de ambos os modelos:
+            - **Mundo Pequeno**: Alta clusterização (formação de grupos como Vingadores, X-Men)
+            - **Livre de Escala**: Distribuição de grau seguindo lei de potência (poucos hubs com muitas conexões)
+            
+            Isso é comum em redes sociais reais, onde há tanto grupos locais quanto conectores globais.
+            """
+        elif is_scale_free:
+            conclusion = "📈 **Rede Livre de Escala**"
+            explanation = """
+            A rede Marvel segue primariamente um modelo livre de escala, com alguns personagens 
+            (hubs) tendo um número desproporcionalmente grande de conexões. Isso reflete o processo 
+            de "conexão preferencial" onde novos personagens tendem a se conectar com os já famosos.
+            """
+        elif is_small_world:
+            conclusion = "🌐 **Rede de Mundo Pequeno**"
+            explanation = """
+            A rede Marvel mostra principalmente características de mundo pequeno, com alta clusterização 
+            local (formação de grupos) mas caminhos curtos entre qualquer par de personagens.
+            """
+        else:
+            conclusion = "❓ **Rede com Características Mistas**"
+            explanation = """
+            A rede Marvel não se encaixa perfeitamente em nenhum dos modelos clássicos, 
+            apresentando características únicas que podem refletir a natureza específica 
+            do universo narrativo da Marvel.
+            """
+        
+        st.markdown(f"**{conclusion}**")
+        st.markdown(explanation)
+
+        else:
+            st.warning("⚠️ Não há dados suficientes para análise de modelos teóricos.")
 
     with tab_links:
         st.subheader("Predição de Links: Quem Deveria Formar uma Equipe?")
@@ -974,14 +1056,12 @@ with st.expander("Clique aqui para ver a análise crítica detalhada", expanded=
 
         if st.button("Calcular Principais Alianças Futuras"):
             with st.spinner("Analisando potenciais novas amizades..."):
-                # Pegar apenas os nós do componente principal para a análise
                 main_nodes = max(nx.connected_components(G), key=len)
                 G_main = G.subgraph(main_nodes)
 
                 possible_edges = list(nx.non_edges(G_main))
                 predictions = list(nx.adamic_adar_index(G_main, possible_edges))
                 
-                # Criar um DataFrame com os resultados
                 pred_df = pd.DataFrame(predictions, columns=['Nó A', 'Nó B', 'Score Adamic-Adar'])
                 pred_df['Personagem A'] = pred_df['Nó A'].map(id_to_name)
                 pred_df['Personagem B'] = pred_df['Nó B'].map(id_to_name)
