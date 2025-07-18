@@ -1174,5 +1174,6 @@ st.markdown("""
     <p><strong>🦸‍♂️ Análise de Redes do Universo Marvel</strong></p>
     <p>Desenvolvido com Streamlit • NetworkX • Pyvis</p>
     <p>Hebert França</p>
+    <p>https://devhebertfst.github.io/NetworkPersonagensMarvel/</p>
 </div>
 """, unsafe_allow_html=True)
