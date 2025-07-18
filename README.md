@@ -56,8 +56,8 @@ Este projeto analisa uma rede onde os nós são personagens Marvel e as arestas 
 
 ### Clone o repositório
 ```bash
-git clone https://github.com/seu-usuario/marvel-network-analysis
-cd marvel-network-analysis
+git clone https://github.com/devHebertfst/AnalisedeRedesFinal.git
+cd AnalisedeRedesFinal
 ```
 
 ### Instale as dependências
@@ -76,14 +76,15 @@ http://localhost:8501
 ```
 
 ## Dependências
-
-Veja o arquivo `requirements.txt` para a lista completa de dependências.
+```
+pip install -r requirements.txt
+```
 
 ## Dataset
 
 O projeto utiliza o dataset **Marvel Universe Social Network**:
 
-- **Fonte**: Marvel Comics Database via GitHub (melaniewalsh/sample-social-network-datasets)
+- **Fonte**: https://github.com/melaniewalsh/sample-social-network-datasets/tree/master/sample-datasets/marvel
 - **Nós**: 327 personagens Marvel
 - **Arestas**: 9,891 co-aparições em quadrinhos
 - **Formato**: CSV com nós e arestas separados
