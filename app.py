@@ -345,7 +345,7 @@ with col1:
         net.set_options("""
         var options = {
           "physics": {
-            "enabled": true,
+            "enabled": false,
             "stabilization": {"iterations": 100},
             "barnesHut": {
               "gravitationalConstant": -3000,
